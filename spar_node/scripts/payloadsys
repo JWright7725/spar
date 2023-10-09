@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+
+#import roslib
+#roslib.load_manifest('spar_node')
+import rospy
+import RPi.GPIO as GPIO
+from std_msgs.msg import Bool
+
+# Set the GPIO pins for the two servo motors
+pin_servo_1 = 11
+pin_servo_2 = 12
+
+# Create two subscribers for controlling the two servo motors
+sub_servo_1 = None
+sub_servo_2 = None
+
+# Initialize the GPIO library
+GPIO.setmode(GPIO.BOARD)
+GPIO.setup(pin_servo_1, GPIO.OUT)
+GPIO.setup(pin_servo_2, GPIO.OUT)
+
+# Create callback functions for the two servo motors
+def callback_servo_1(msg_in):
+    # A bool message contains one field called "data" which can be true or false
+    # http://docs.ros.org/melodic/api/std_msgs/html/msg/Bool.html
+    if msg_in.data:
+        rospy.loginfo("Setting servo 1 high!")
+        # Replace the following code with your servo control logic for servo 1
+        GPIO.output(pin_servo_1, GPIO.HIGH)
+    else:
+        rospy.loginfo("Setting servo 1 low!")
+        # Replace the following code with your servo control logic for servo 1
+        GPIO.output(pin_servo_1, GPIO.LOW)
+
+def callback_servo_2(msg_in):
+    # A bool message contains one field called "data" which can be true or false
+    # http://docs.ros.org/melodic/api/std_msgs/html/msg/Bool.html
+    if msg_in.data:
+        rospy.loginfo("Setting servo 2 high!")
+        # Replace the following code with your servo control logic for servo 2
+        GPIO.output(pin_servo_2, GPIO.HIGH)
+    else:
+        rospy.loginfo("Setting servo 2 low!")
+        # Replace the following code with your servo control logic for servo 2
+        GPIO.output(pin_servo_2, GPIO.LOW)
+
+def shutdown():
+    # Clean up our ROS subscribers if they were set, avoids error messages in logs
+    if sub_servo_1 is not None:
+        sub_servo_1.unregister()
+    if sub_servo_2 is not None:
+        sub_servo_2.unregister()
+
+    # Close down our GPIO
+    GPIO.cleanup()
+
+if __name__ == '__main__':
+    # Setup the ROS backend for this node
+    rospy.init_node('actuator_controller', anonymous=True)
+
+    # Setup the publishers and subscribers for the two servo motors
+    sub_servo_1 = rospy.Subscriber('/actuator_control/servo_1', Bool, callback_servo_1)
+    sub_servo_2 = rospy.Subscriber('/actuator_control/servo_2', Bool, callback_servo_2)
+
+    # Make sure we clean up all our code before exiting
+    rospy.on_shutdown(shutdown)
+
+    # Loop forever
+    rospy.spin()
+
+# rostopic pub/actuator_control/servo_1 std_msgs/Bool '{data: True}'
+# rostopic pub/actuator_control/servo_2 std_msgs/Bool '{data: True}'
+
+# rostopic pub /actuator_control/actuator_a std_msgs/Bool '{data: True}'
+
