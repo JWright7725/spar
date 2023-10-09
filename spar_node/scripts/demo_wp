@@ -11,9 +11,19 @@ from actionlib_msgs.msg import GoalStatus
 
 from spar_msgs.msg import FlightMotionAction, FlightMotionGoal
 
+# Create a variable to contain the flight height of the UAV (1.5 < x < 4 [metres])
+global flight_height
+flight_height = 2
+
+# Ensure flight height is within range of acceptable values
+if flight_height < 1.5:
+	flight_height = 1.5
+elif flight_height > 4:
+	flight_height = 4
+
 def send_wp(spar_client, x, y, z, yaw):
-	speed = rospy.get_param("~speed", 1.0)
-	accuracy = rospy.get_param("~accuracy", 0.1)
+	speed = rospy.get_param("~speed", 0.6)
+	accuracy = rospy.get_param("~accuracy", 0.3)
 
 	goal = FlightMotionGoal()
 	goal.motion = FlightMotionGoal.MOTION_GOTO
@@ -23,7 +33,7 @@ def send_wp(spar_client, x, y, z, yaw):
 	goal.yaw = yaw
 	goal.velocity_vertical = speed
 	goal.velocity_horizontal = speed
-	goal.yawrate = speed
+	goal.yawrate = 0.2
 	goal.wait_for_convergence = True							# Wait for our takeoff "waypoint" to be reached
 	goal.position_radius = accuracy
 	goal.yaw_range = accuracy
@@ -45,12 +55,27 @@ def send_wps(spar_client):
 
 	# List of waypoints
 	# [X, Y, Z, Yaw]
-	wps = [[ 0.0, 0.0, 1.0, 0.0],
-		   [ 1.0, 1.0, 1.0, 0.0],
-		   [-1.0, 1.0, 1.0, 0.0],
-		   [-1.0,-1.0, 1.0, 0.0],
-		   [ 1.0,-1.0, 1.0, 0.0],
-		   [ 0.0, 0.0, 1.0, 0.0]]
+	wps = [[-1, -1, flight_height, 0], # Fly straight up to operating height
+
+	       [-4, -2.5, flight_height, 0], # Move to first corner
+	       [4 , -2.5, flight_height, 0], # Fly along the length of the flight area
+
+		   [4 , -1.5, flight_height, 0], # Fly to the next waypoint
+	       [-4, -1.5, flight_height, 0], # Undertake the second pass
+
+	       [-4, -0.5, flight_height, 0], # Fly to the next waypoint
+	       [4 , -0.5, flight_height, 0], # Undertake the third pass
+
+		   [4 , 0.5, flight_height, 0], # Fly to the next waypoint
+	       [-4, 0.5, flight_height, 0], # Undertake the fourth pass
+	       
+		   [-4, 1.5, flight_height, 0], # Fly to the next waypoint
+	       [4 , 1.5, flight_height, 0], # Undertake the fifth pass
+
+		   [4 , 2.5, flight_height, 0], # Fly to the next waypoint
+	       [-4, 2.5, flight_height, 0], # Undertake the sixth pass
+	              
+	       [-1, -1, flight_height, 0]] # Fly back to the start location
 
 	# Loop through each waypoint in our list
 	i = 0
