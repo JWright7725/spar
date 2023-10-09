@@ -170,9 +170,12 @@ target_link_libraries(${PROJECT_NAME}
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
   scripts/demo_wp
+  scripts/demo_wp_roi_inprogress
+  scripts/manual_target_publisher_roi
   scripts/goto
   scripts/takeoff
   scripts/land
+  scripts/payloadsys
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
