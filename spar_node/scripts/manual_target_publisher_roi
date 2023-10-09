@@ -1,0 +1,30 @@
+#!/usr/bin/env python3
+
+import rospy
+
+from geometry_msgs.msg import PoseStamped
+from std_msgs.msg import String
+
+if __name__ == "__main__":
+    # ASK JULIAN ABOUT THIS
+    rospy.init_node('node_name')
+
+    # Create an ROI publisher
+    roi_pub = rospy.Publisher("/roi", PoseStamped, queue_size=10, latch = True)
+
+    # Initialise the ROI publisher message type
+    roi_msg_out = PoseStamped()
+    # Update message parameters
+    roi_msg_out.pose.position.x = 0
+    roi_msg_out.pose.position.y = 0
+    # Publish the ROI message
+    roi_pub.publish(roi_msg_out)
+
+    # Create a target publisher
+    
+    
+
+    try:
+        rospy.spin()
+    except rospy.ROSInterrupyException:
+        pass
