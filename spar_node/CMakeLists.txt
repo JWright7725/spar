@@ -177,6 +177,7 @@ catkin_install_python(PROGRAMS
   scripts/land
   scripts/payloadsys
   scripts/localisation_test
+  scripts/final_simulation_code
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
