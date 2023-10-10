@@ -59,7 +59,7 @@ class Guidance():
 		self.accuracy_yaw = rospy.get_param("~acc_yaw", 0.3)
 
 		# Set the low battery charge and voltage thresholds
-		self.low_batt = 0.5
+		self.low_batt = 0.15
 		self.low_volt = 10.2
 
 		# Set the default battery charge and voltage
@@ -76,7 +76,7 @@ class Guidance():
 		self.aruco_found = False
 		self.completed_search = False
 		self.reached_wp_1 = False # Check if the UAV has reached the first waypoint, used to cancel target detection
-		self.aruco_id = -1
+		self.aruco_id = 0
 
 		# Camera Variables
 		self.camera_FOV_x = 54 * (pi / 180) # [rad]
@@ -84,9 +84,9 @@ class Guidance():
 
 		# Payload Servo Motors
 		# Set the GPIO data pin for the Backpack Servo to Pin 14
-		self.backpack_servo = AngularServo(14, min_pulse_width=0.0005, max_pulse_width=0.0024)
+		# self.backpack_servo = AngularServo(14, min_pulse_width=0.0005, max_pulse_width=0.0024)
 		# Set the GPIO data pin for the Person Servo to Pin 15
-		self.person_servo = AngularServo(15, min_pulse_width=0.0005, max_pulse_width=0.0024)
+		# self.person_servo = AngularServo(15, min_pulse_width=0.0005, max_pulse_width=0.0024)
 
 		# Create a variable to determine if the UAV should restart the search pattern 
 		# if all mission requirements have not been met
@@ -118,16 +118,16 @@ class Guidance():
 
 			# Callback to save "current location" such that we can perform and return
 			# from a diversion to the correct location
-			self.sub_pose = rospy.Subscriber("~/pose", PoseStamped, self.callback_pose)
+			self.sub_pose = rospy.Subscriber("/uavasr/pose", PoseStamped, self.callback_pose)
 
 			# Subscriber for current battery state of charge
-			self.sub_battery = rospy.Subscriber("~/battery", BatteryState, self.callback_battery)
+			self.sub_battery = rospy.Subscriber("/uavasr/battery", BatteryState, self.callback_battery)
 
 			# Subscriber for ArUco Marker Detection
-			self.sub_aruco = rospy.Subscriber("~/aruco", ArucoLocalisation, self.callback_aruco_marker)
+			self.sub_aruco = rospy.Subscriber('/processed_aruco/localisation', ArucoLocalisation, self.callback_aruco_marker)
 
 			# Subscriber for target Detection (Only Recieves info if target is found)
-			self.sub_target = rospy.Subscriber("/target", ArucoLocalisation, self.callback_target_detection)
+			self.sub_target = rospy.Subscriber("/depthai_node/target_localisation", ArucoLocalisation, self.callback_target_detection)
 
 			# Publish the necessary information for the e-speak module
 			self.espeak_pub = rospy.Publisher("/espeak", ArucoLocalisation, queue_size = 10, latch=True)
@@ -332,9 +332,11 @@ class Guidance():
 	# Activate the servo motor attached to the payload delivery mechanism for the appropriate target
 	def deploy_payload(self, id):
 		if id == 0: # Target is the Backpack
+			self.backpack_servo = AngularServo(14, min_pulse_width=0.0005, max_pulse_width=0.0024)
 			self.backpack_servo.angle = 90
 			rospy.loginfo('Dropped Backpack Payload')
 		elif id == 1: # Target is the Astronaut
+			self.person_servo = AngularServo(15, min_pulse_width=0.0005, max_pulse_width=0.0024)
 			self.person_servo.angle = 90
 			rospy.loginfo('Dropped Astronaut Payload')
 		else:
@@ -399,53 +401,60 @@ class Guidance():
 	def callback_battery(self, msg_in):
 		self.batt_per = msg_in.percentage
 		self.batt_volt = msg_in.voltage
-		rospy.loginfo(f'Battery Percentage is: {self.batt_per}')
-		rospy.loginfo(f'Battery Voltage is: {self.batt_volt}')
+		# rospy.loginfo(f'Battery Percentage is: {self.batt_per}')
+		# rospy.loginfo(f'Battery Voltage is: {self.batt_volt}')
 
 	# Callback function for determining the location of the ArUco marker for landing
 	def callback_aruco_marker(self, msg_in):
 		if self.reached_wp_1:
-			aruco_location = self.aruco_frame_translation([msg_in.frame_x, msg_in.frame_y])
-			rospy.loginfo(f'ArUco Marker {msg_in.aruco_id} Detected at x: {aruco_location[0]}, y: {aruco_location[1]}')
 			if not self.aruco_found:
+				rospy.loginfo('ArUco Found!')
 				# Store the first ArUco marker, regardless of ID
 				if self.aruco_id == -1:
+					aruco_location = self.aruco_frame_translation([msg_in.frame_x, msg_in.frame_y])
+					rospy.loginfo(f'UAV Location at x: {self.current_location.x}, y: {self.current_location.y}')
+					rospy.loginfo(f'ArUco Marker {msg_in.aruco_id} Detected at x: {aruco_location[0]}, y: {aruco_location[1]}')
 					# Update the landing location to the current loation when an ArUco marker is found
-					self.landing_wp = [self.current_location.x, self.current_location.y, flight_height, pi]
+					#self.landing_wp = [self.current_location.x, self.current_location.y, flight_height, pi]
 					## Change if aruco location is outputted correctly above
-					# self.landing_wp = [aruco_location[0], aruco_location[1], flight_height, pi]
+					self.landing_wp = [aruco_location[0], aruco_location[1], flight_height, pi]
 					self.aruco_found = True
 				elif msg_in.aruco_id == self.aruco_id:
+					aruco_location = self.aruco_frame_translation([msg_in.frame_x, msg_in.frame_y])
+					rospy.loginfo(f'UAV Location at x: {self.current_location.x}, y: {self.current_location.y}')
+					rospy.loginfo(f'ArUco Marker {msg_in.aruco_id} Detected at x: {aruco_location[0]}, y: {aruco_location[1]}')
 					# Update the landing location to the current loation when an ArUco marker is found
-					self.landing_wp = [self.current_location.x, self.current_location.y, flight_height, pi]
+					# self.landing_wp = [self.current_location.x, self.current_location.y, flight_height, pi]
 					## Change if aruco location is outputted correctly above
-					# self.landing_wp = [aruco_location[0], aruco_location[1], flight_height, pi]
+					self.landing_wp = [aruco_location[0], aruco_location[1], flight_height, pi]
 					self.aruco_found = True
 
 	# Callback function for target detection
 	def callback_target_detection(self, msg_in):
-		if self.reached_wp_1:
-			target_location = self.target_frame_translation([msg_in.frame_x, msg_in.frame_y])
-			rospy.loginfo(f'Target Found at x: {target_location[0]}, y: {target_location[1]}!')
+		if self.reached_wp_1:	
 			if msg_in.aruco_id == 1: # Target is the astronaut
-				rospy.loginfo('Target is the astronaut')
 				if not self.med_drop: # Only call this functionality on the first observation of the astronaut
+					astronaut_location = self.target_frame_translation([msg_in.frame_x, msg_in.frame_y])		
+					rospy.loginfo(f'Target Found at x: {astronaut_location[0]}, y: {astronaut_location[1]}!')
+					rospy.loginfo('Target is the astronaut')
 					self.med_drop = True
-					self.publish_marker_person(target_location) # Publish a marker to RViz at the current UAV location
-					self.publish_espeak(msg_in.aruco_id, target_location) # Call the espeak at the target location
-					self.inspect_roi(msg_in.aruco_id, [-1, -1]) # Call the ROI at a set location (-1, -1) CHANGE THIS LOCATION LATER
+					self.publish_marker_person(astronaut_location) # Publish a marker to RViz at the current UAV location
+					self.publish_espeak(msg_in.aruco_id, astronaut_location) # Call the espeak at the target location
+					# self.inspect_roi(msg_in.aruco_id, [-1, -1]) # Call the ROI at a set location (-1, -1) CHANGE THIS LOCATION LATER
 					## Change if the target location is outputted correctly
-					# self.inspect_roi(msg_in.aruco_id, target_location) # Call the ROI at the target location
+					self.inspect_roi(msg_in.aruco_id, astronaut_location) # Call the ROI at the target location
 
 			elif msg_in.aruco_id == 0: # Target is the Backpack
-				rospy.loginfo('Target is the backpack')
 				if not self.tracker_drop: # Only call this functionality on the first observation of the backpack
+					backpack_location = self.target_frame_translation([msg_in.frame_x, msg_in.frame_y])		
+					rospy.loginfo(f'Target Found at x: {backpack_location[0]}, y: {backpack_location[1]}!')
+					rospy.loginfo('Target is the backpack')
 					self.tracker_drop = True
-					self.publish_marker_backpack(target_location) # Publish a marker to RViz at the current UAV location
-					self.publish_espeak(msg_in.aruco_id, target_location) # Call the espeak at the target location
-					self.inspect_roi(msg_in.aruco_id, [1, 1]) # Call the ROI at a set location (1, 1) CHANGE THIS LOCATION LATER
+					self.publish_marker_backpack(backpack_location) # Publish a marker to RViz at the current UAV location
+					self.publish_espeak(msg_in.aruco_id, backpack_location) # Call the espeak at the target location
+					# self.inspect_roi(msg_in.aruco_id, [1, 1]) # Call the ROI at a set location (1, 1) CHANGE THIS LOCATION LATER
 					## Change if the target location is outputted correctly
-					# self.inspect_roi(msg_in.aruco_id, target_location) # Call the ROI at the target location
+					self.inspect_roi(msg_in.aruco_id, backpack_location) # Call the ROI at the target location
 			else:
 				rospy.loginfo('Unknown Target')
 
@@ -455,7 +464,7 @@ class Guidance():
 	# Function for publishing e-speak data to the GCS
 	def publish_espeak(self, id, location):
 		msg_out = ArucoLocalisation()
-		msg_out.id = id
+		msg_out.aruco_id = id
 		msg_out.frame_x = location[0] # This is actually the world x coordinate, not frame
 		msg_out.frame_y = location[1] # This is actually the world y coordinate, not frame
 		self.espeak_pub.publish(msg_out)
@@ -509,6 +518,7 @@ class Guidance():
 		msg_out.color.a = 1.0
 
 		# Publish the marker
+		rospy.loginfo('Publishing Person Marker')
 		self.marker_pub.publish(msg_out)
 
 	# Publish Backpack Marker to RViz (CHANGE LOCATION OF MARKER)
@@ -560,6 +570,7 @@ class Guidance():
 		msg_out.color.a = 1.0
 
 		# Publish the marker
+		rospy.loginfo('Publishing Backpack Marker')
 		self.marker_pub.publish(msg_out)
 
 
