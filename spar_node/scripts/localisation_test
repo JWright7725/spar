@@ -28,7 +28,7 @@ class Localisation():
 		rospy.loginfo(f'Aruco Location: {aruco_location}')
 
 	def target_callback_localisation(self, msg_in):
-		target_location = self.target_callback_localisation([msg_in.frame_x, msg_in.frame_y])
+		target_location = self.target_frame_translation([msg_in.frame_x, msg_in.frame_y])
 		rospy.loginfo(f'Target ID: {msg_in.aruco_id}')
 		rospy.loginfo(f'Taret Location: {target_location}')
 
