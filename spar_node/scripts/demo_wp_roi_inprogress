@@ -5,6 +5,7 @@ from math import *
 
 import rospy
 import actionlib
+from gpiozero import AngularServo
 
 # Import ROS Message Definitions
 from actionlib_msgs.msg import GoalStatus
@@ -81,6 +82,11 @@ class Guidance():
 		self.camera_FOV_x = 54 * (pi / 180) # [rad]
 		self.camera_FOV_y = 66 * (pi / 180) # [rad]
 
+		# Payload Servo Motors
+		# Set the GPIO data pin for the Backpack Servo to Pin 14
+		self.backpack_servo = AngularServo(14, min_pulse_width=0.0005, max_pulse_width=0.0024)
+		# Set the GPIO data pin for the Person Servo to Pin 15
+		self.person_servo = AngularServo(15, min_pulse_width=0.0005, max_pulse_width=0.0024)
 
 		# Create a variable to determine if the UAV should restart the search pattern 
 		# if all mission requirements have not been met
@@ -323,6 +329,18 @@ class Guidance():
 		world_location = [world_x, world_y]
 		return world_location
 
+	# Activate the servo motor attached to the payload delivery mechanism for the appropriate target
+	def deploy_payload(self, id):
+		if id == 0: # Target is the Backpack
+			self.backpack_servo.angle = 90
+			rospy.loginfo('Dropped Backpack Payload')
+		elif id == 1: # Target is the Astronaut
+			self.person_servo.angle = 90
+			rospy.loginfo('Dropped Astronaut Payload')
+		else:
+			rospy.loginfo('How did I get here??')
+
+
 	## TAKEOFF / LANDING FUNCTIONS
 
 	# Create a function for takeoff of the UAV
@@ -407,9 +425,7 @@ class Guidance():
 	# Callback function for target detection
 	def callback_target_detection(self, msg_in):
 		if self.reached_wp_1:
-			# UPDATE THIS WITH TARGET LOCALISATION
-			# target_location = self.target_frame_translation([msg_in.frame_x, msg_in.frame_y])
-			target_location = [0, 0]
+			target_location = self.target_frame_translation([msg_in.frame_x, msg_in.frame_y])
 			rospy.loginfo(f'Target Found at x: {target_location[0]}, y: {target_location[1]}!')
 			if msg_in.aruco_id == 1: # Target is the astronaut
 				rospy.loginfo('Target is the astronaut')
@@ -641,23 +657,17 @@ class Guidance():
 		rospy.loginfo("Reached diversion ROI!")
 		# XXX: Do something?
 
+		# Payload Deployment
+
+		# Pause for 2 seconds to ensure the flight platform is stable before dropping the payload
+		rospy.sleep(rospy.Duration(2)) 
 		# Deploy the appropriate payload
-		# self.deploy_payload(id)
-		## Utilise the ID of the target to determine which payload is deployed
-		# Determine which payload to drop based on the target ID
+		rospy.loginfo('Dropping Payload')
+		self.deploy_payload(id)
+		# Pause for 3 seconds to ensure the servo motor is in use during flight
+		rospy.sleep(rospy.Duration(3))
 
-		## Can Remove this soon
-		# # Initialise the target publisher message type
-		# target_msg_out = String()
-		# # Update the essage parameters
-		# target_msg_out.data = 'Backpack'
-		# # Publish the target message
-		# self.target_pub.publish(target_msg_out)
-
-		#rospy.loginfo('Dropping Payload')
-		# Implement Payload Delivery HERE!!!!
-
-		rospy.sleep(rospy.Duration(10)) # Pause for 10 seconds while the ROI behaviour is being undertaken
+		# Pause for 10 seconds while the ROI behaviour is being undertaken
 
 		rospy.loginfo("Returning to flight plan...")
 
@@ -684,21 +694,7 @@ class Guidance():
 		# Unset our flag that we are performing a diversion
 		# to allow the waypoint timer to take back over
 		self.performing_roi = False
-
-	# def deploy_payload(self, id):
-	# 	if id == 0:  # Target ID 0 represents the backpack
-	# 		rospy.loginfo("Dropping Backpack Payload")
-	# 		self.trigger_servo('/actuator_control/servo_2')
-	# 	elif id == 1:  # Target ID 1 represents the astronaut
-	# 		rospy.loginfo("Dropping Astronaut Payload")
-	# 		self.trigger_servo('/actuator_control/servo_1')
-	# 	else:
-	# 		rospy.loginfo("Unknown Target ID, No Payload Dropped")
-
-	# def trigger_servo(self, servo_topic):
-	# 	payload_msg = Bool()
-	# 	payload_msg.data = True
-	# 	rospy.Publisher(servo_topic, Bool, queue_size=1).publish(payload_msg)
+	
 
 # The main function call
 # Used to initialise the guidance class
