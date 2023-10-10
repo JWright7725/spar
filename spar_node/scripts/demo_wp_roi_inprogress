@@ -13,7 +13,7 @@ from spar_msgs.msg import FlightMotionAction, FlightMotionGoal, ArucoLocalisatio
 from visualization_msgs.msg import Marker
 from sensor_msgs.msg import BatteryState
 from nav_msgs.msg import Path
-from std_msgs.msg import String
+from std_msgs.msg import String, Bool
 
 # Libraries required for interfacing with Breadcrumb
 from breadcrumb.srv import RequestPath
@@ -357,6 +357,8 @@ class Guidance():
 	def callback_battery(self, msg_in):
 		self.batt_per = msg_in.percentage
 		self.batt_volt = msg_in.voltage
+		rospy.loginfo(f'Battery Percentage is: {self.batt_per}')
+		rospy.loginfo(f'Battery Voltage is: {self.batt_volt}')
 
 	# Callback function for determining the location of the ArUco marker for landing
 	def callback_aruco_marker(self, msg_in):
@@ -386,7 +388,7 @@ class Guidance():
 			rospy.loginfo('Target is the astronaut')
 			if not self.med_drop: # Only call this functionality on the first observation of the astronaut
 				self.med_drop = True
-				self.publish_marker_person() # Publish a marker to RViz at the current UAV location
+				self.publish_marker_person(target_location) # Publish a marker to RViz at the current UAV location
 				self.publish_espeak(msg_in.aruco_id, target_location) # Call the espeak at the target location
 				self.inspect_roi(msg_in.aruco_id, [-1, -1]) # Call the ROI at a set location (-1, -1) CHANGE THIS LOCATION LATER
 				## Change if the target location is outputted correctly
@@ -396,7 +398,7 @@ class Guidance():
 			rospy.loginfo('Target is the backpack')
 			if not self.tracker_drop: # Only call this functionality on the first observation of the backpack
 				self.tracker_drop = True
-				self.publish_marker_backpack() # Publish a marker to RViz at the current UAV location
+				self.publish_marker_backpack(target_location) # Publish a marker to RViz at the current UAV location
 				self.publish_espeak(msg_in.aruco_id, target_location) # Call the espeak at the target location
 				self.inspect_roi(msg_in.aruco_id, [1, 1]) # Call the ROI at a set location (1, 1) CHANGE THIS LOCATION LATER
 				## Change if the target location is outputted correctly
@@ -416,7 +418,7 @@ class Guidance():
 		self.espeak_pub.publish(msg_out)
 
 	# Publish Astronaut Marker to RViz (CHANGE LOCATION OF MARKER)
-	def publish_marker_person(self):
+	def publish_marker_person(self, target_location):
 		# Set up the message header
 		msg_out = Marker()
 		msg_out.header.frame_id = "map"
@@ -443,8 +445,8 @@ class Guidance():
 
 		# Place the marker at the current UAV horizontal position, and at a height of 0m (On the ground) 
 		# UPDATE THIS WITH LOCALISATION
-		msg_out.pose.position.x = self.current_location.x
-		msg_out.pose.position.y = self.current_location.y
+		msg_out.pose.position.x = target_location[0]
+		msg_out.pose.position.y = target_location[1]
 		msg_out.pose.position.z = 0.0
 		msg_out.pose.orientation.w = 1.0
 		msg_out.pose.orientation.x = 0.0
@@ -467,7 +469,7 @@ class Guidance():
 		self.marker_pub.publish(msg_out)
 
 	# Publish Backpack Marker to RViz (CHANGE LOCATION OF MARKER)
-	def publish_marker_backpack(self):
+	def publish_marker_backpack(self, target_location):
 		# Set up the message header
 		msg_out = Marker()
 		msg_out.header.frame_id = "map"
@@ -494,8 +496,8 @@ class Guidance():
 
 		# Place the marker at the current UAV horizontal position, and at a height of 0m (On the ground) 
 		# UPDATE THIS WITH LOCALISATION
-		msg_out.pose.position.x = self.current_location.x
-		msg_out.pose.position.y = self.current_location.y
+		msg_out.pose.position.x = target_location[0]
+		msg_out.pose.position.y = target_location[1]
 		msg_out.pose.position.z = 0.0
 		msg_out.pose.orientation.w = 1.0
 		msg_out.pose.orientation.x = 0.0
@@ -586,13 +588,23 @@ class Guidance():
 
 		# Set the "diversion waypoint" (at yaw zero)
 		dwp = [location[0], location[1], flight_height, 0.0]
+		lower_wp = [location[0], location[1], 0.7, 0.0]
 		# Set the "return waypoint" (at yaw zero)
 		rwp = [self.current_location.x, self.current_location.y, flight_height, 0.0]
 		rospy.loginfo(f'x: {self.current_location.x}, y: {self.current_location.y}')
 
 		# XXX: Could pause here for a moment with ( "rospy.sleep(...)" ) to make sure the UAV stops correctly
 
+		# Divert to the ROI location
 		self.send_wp(dwp)
+		self.spar_client.wait_for_result()
+		if self.spar_client.get_state() != GoalStatus.SUCCEEDED:
+			# Something went wrong, cancel out of guidance!
+			rospy.signal_shutdown("cancelled")
+			return
+		
+		# Lower the UAV to the payload deployment height
+		self.send_wp(lower_wp)
 		self.spar_client.wait_for_result()
 		if self.spar_client.get_state() != GoalStatus.SUCCEEDED:
 			# Something went wrong, cancel out of guidance!
@@ -622,6 +634,15 @@ class Guidance():
 
 		rospy.loginfo("Returning to flight plan...")
 
+		# Raise the UAV to the flight height
+		self.send_wp(dwp)
+		self.spar_client.wait_for_result()
+		if self.spar_client.get_state() != GoalStatus.SUCCEEDED:
+			# Something went wrong, cancel out of guidance!
+			rospy.signal_shutdown("cancelled")
+			return
+
+		# Return to the initial UAV location
 		self.send_wp(rwp)
 		self.spar_client.wait_for_result()
 		if self.spar_client.get_state() != GoalStatus.SUCCEEDED:
