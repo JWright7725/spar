@@ -335,10 +335,14 @@ class Guidance():
 			self.backpack_servo = AngularServo(14, min_pulse_width=0.0005, max_pulse_width=0.0024)
 			self.backpack_servo.angle = 90
 			rospy.loginfo('Dropped Backpack Payload')
+			rospy.sleep(rospy.Duration(2)) 
+			self.backpack_servo.close()
 		elif id == 1: # Target is the Astronaut
 			self.person_servo = AngularServo(15, min_pulse_width=0.0005, max_pulse_width=0.0024)
 			self.person_servo.angle = 90
 			rospy.loginfo('Dropped Astronaut Payload')
+			rospy.sleep(rospy.Duration(2)) 
+			self.person_servo.close()
 		else:
 			rospy.loginfo('How did I get here??')
 
@@ -406,7 +410,8 @@ class Guidance():
 
 	# Callback function for determining the location of the ArUco marker for landing
 	def callback_aruco_marker(self, msg_in):
-		if self.reached_wp_1:
+		# Only run ArUco detection if the UAV is at the desired flight height (Reached the first waypoint, and not performing ROI tasks)
+		if self.reached_wp_1 and not self.performing_roi:
 			if not self.aruco_found:
 				rospy.loginfo('ArUco Found!')
 				# Store the first ArUco marker, regardless of ID
@@ -431,7 +436,8 @@ class Guidance():
 
 	# Callback function for target detection
 	def callback_target_detection(self, msg_in):
-		if self.reached_wp_1:	
+		# Only run target detection if the UAV is at the desired flight height (Reached the first waypoint, and not performing ROI tasks)
+		if self.reached_wp_1 and not self.performing_roi:	
 			if msg_in.aruco_id == 1: # Target is the astronaut
 				if not self.med_drop: # Only call this functionality on the first observation of the astronaut
 					astronaut_location = self.target_frame_translation([msg_in.frame_x, msg_in.frame_y])		
