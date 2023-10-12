@@ -368,9 +368,15 @@ class Guidance():
 		#XXX: Implement movement to either the correct ArUco marker or [-1, -1]\
 		#	  This can be achieved by altering the [X,Y] co-ordinates within the landing_wp
 		#	  variable when the ArUco marker is seen
-		self.send_wp(self.landing_wp)
-		# Wait for the UAV to reach the desired landing co-ordinates
-		self.spar_client.wait_for_result()
+		
+		# Create a list of breadcrumb waypoints between the current location and the landing location
+		starting_location = [self.current_location.x, self.current_location.y, flight_height, 0]
+		self.landing_path = self.breadcrumb_wps([starting_location, self.landing_wp])
+
+		for waypoint in self.landing_path:
+			self.send_wp(waypoint)
+			# Wait for the UAV to reach the desired landing co-ordinates
+			self.spar_client.wait_for_result()
 
 		# Create our goal object for landing
 		goal = FlightMotionGoal()
